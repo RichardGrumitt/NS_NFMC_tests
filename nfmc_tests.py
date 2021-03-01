@@ -22,6 +22,6 @@ with rg_model:
     b = pm.Normal('b', mu=1, sigma=1)
 
     like = pm.Normal('like', mu=a*x+b, sigma=0.1, observed=y)
-    trace = pm.sample_nfmc(1000, optim_iter=2000, nf_iter=3, chains=1, frac_validate=0.1, alpha=None,
+    trace = pm.sample_nfmc(1000, optim_iter=2000, nf_iter=3, chains=1, frac_validate=0.1, alpha=(0,0),
                            parallel=False)
     az_trace = az.from_pymc3(trace)
