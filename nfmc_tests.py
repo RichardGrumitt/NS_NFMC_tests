@@ -22,6 +22,9 @@ with rg_model:
     b = pm.Normal('b', mu=1, sigma=1)
 
     like = pm.Normal('like', mu=a*x+b, sigma=0.1, observed=y)
-    trace = pm.sample_nfmc(1000, optim_iter=2000, nf_iter=3, chains=1, frac_validate=0.1, alpha=(0,0),
-                           parallel=False)
-    az_trace = az.from_pymc3(trace)
+    
+    rg_trace = pm.sample_nfmc(1000, init_method='full_rank', local_thresh=3, local_step_size=0.1, 
+                              local_grad=True, init_local=True, nf_local_iter=0, nf_iter=20, chains=1,
+                              frac_validate=0.2, alpha=(0,0), parallel=False, bw_factor=2.0,
+                              k_trunc=0.25, pareto=True, iteration=5)
+    rg_az_trace = az.from_pymc3(rg_trace)
