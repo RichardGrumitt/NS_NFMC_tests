@@ -9,12 +9,13 @@ import pymc3 as pm
 import theano
 import theano.tensor as tt
 import pandas as pd
+import scipy
 
 print(f"Running on PyMC3 v{pm.__version__}")
 
 az.style.use("arviz-darkgrid")
 
-
+'''
 rg_model = pm.Model()
 x = np.arange(10)
 y = 2 * x + 1 + np.random.normal(scale=0.1)
@@ -33,7 +34,7 @@ with rg_model:
                               k_trunc=0.25, pareto=True, iteration=5, norm_tol=0.05)
     rg_az_trace = az.from_pymc3(rg_trace)
 
-'''
+
 data = pd.read_csv(pm.get_data("radon.csv"))
 data["log_radon"] = data["log_radon"].astype(theano.config.floatX)
 county_names = data.county.unique()
@@ -76,3 +77,40 @@ with hierarchical_model:
                                            iteration=5, norm_tol=0.05)
     hierarchical_az_nf_trace = az.from_pymc3(hierarchical_nf_trace)
 '''
+
+n = 250
+np.random.seed(1111)
+# Draw precision matrix from the Wishart distribution, with n degrees of freedom and identity scale.
+wish = scipy.stats.wishart(df=n, scale=np.eye(n))
+A = wish.rvs()
+detA = np.linalg.det(A)
+print(np.linalg.inv(A))
+
+def gaussian(x):
+    log_like = (
+        -0.5 * n * tt.log(2 * np.pi)
+        - 0.5 * (x).T.dot(A).dot(x)
+    )
+    
+    return log_like
+
+with pm.Model() as model:
+    
+    #X = pm.Flat('X', shape=n, testval=0)
+    X = pm.Uniform('X', lower=-5, upper=5, shape=n, testval=0)
+    llk = pm.Potential("llk", gaussian(X))
+    #X = pm.MvNormal('X', mu=np.zeros(n), tau=A, shape=n)
+    
+with model:
+    
+    g_start = {'X': np.zeros(n)}
+    g_trace = pm.sample_nfmc(draws=500, init_draws=5000, resampling_draws=1000, 
+                             init_method='advi', start=g_start, local_thresh=1, 
+                             local_step_size=0.5, init_EL2O='scipy', mean_field_EL2O=True, 
+                             use_hess_EL2O=False, EL2O_optim_method='adam', EL2O_draws=250,
+                             local_grad=True, init_local=True, full_local=False, nf_local_iter=20,
+                             nf_iter=40, chains=1,  frac_validate=0.2, alpha=(0,0), parallel=False,
+                             NBfirstlayer=True, k_trunc=0.5, iteration=10, norm_tol=0.03,
+                             bw_factor_min=0.5, bw_factor_max=5.0, bw_factor_num=21, 
+                             max_line_search=2, adam_steps=2)
+    g_az_trace = az.from_pymc3(g_trace)
